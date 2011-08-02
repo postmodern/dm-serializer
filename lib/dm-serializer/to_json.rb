@@ -39,9 +39,9 @@ module DataMapper
       # TODO: This needs tests and also needs to be ported to #to_xml and
       # #to_yaml
       if options[:relationships]
-        options[:relationships].each do |relationship_name, opts|
+        options[:relationships].each do |relationship_name,opts|
           if respond_to?(relationship_name)
-            result[relationship_name] = __send__(relationship_name).to_json(opts.merge(:to_json => false))
+            result[relationship_name] = __send__(relationship_name).as_json(opts)
           end
         end
       end
@@ -68,8 +68,26 @@ module DataMapper
 
     module ValidationErrors
       module ToJson
+        #
+        # Converts the validation errors into a hash.
+        #
+        # @param [Hash] options
+        #   Additional options.
+        #
+        # @return [Hash{String => String}]
+        #   The hash of properties and validation errors.
+        #
+        # @since 1.2.0
+        #
+        def as_json(options={})
+          Hash[errors]
+        end
+
         def to_json(*args)
-          MultiJson.encode(Hash[ errors ])
+          options = args.first
+          options = {} unless options.kind_of?(Hash)
+
+          MultiJson.encode(as_json(options))
         end
       end
     end
@@ -77,12 +95,28 @@ module DataMapper
   end
 
   class Collection
+    #
+    # Converts the collection into an Array of Hashes.
+    #
+    # @param [Hash] options
+    #   Additional options.
+    #
+    # @return [Array<Hash{String => String}>]
+    #   The Array of Hashes that represents the collection of resources.
+    #
+    # @since 1.2.0
+    #
+    def as_json(options={})
+      options = {} if options.nil?
+
+      map { |resource| resource.as_json(options) }
+    end
+
     def to_json(*args)
       options = args.first
       options = {} unless options.kind_of?(Hash)
 
-      resource_options = options.merge(:to_json => false)
-      collection = map { |resource| resource.to_json(resource_options) }
+      collection = as_json(options)
 
       # default to making JSON
       if options.fetch(:to_json, true)
